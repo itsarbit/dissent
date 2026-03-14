@@ -1,0 +1,44 @@
+name: PR checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  pr-checks:
+    name: PR checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title format
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+
+            if (title.length > 72) {
+              core.setFailed(
+                `PR title is ${title.length} characters (max 72).\n` +
+                `Title: "${title}"`
+              );
+              return;
+            }
+
+            // Format: <type>(<scope>): <description>  (scope is optional)
+            const pattern = /^(feat|fix|docs|chore|ci|build|refactor|test|perf|style|revert)(\([a-z][a-z0-9_-]*\))?!?: .+$/;
+            if (!pattern.test(title)) {
+              core.setFailed(
+                `PR title does not match the required format.\n\n` +
+                `Expected: <type>(<scope>): <description>\n` +
+                `  - type: feat, fix, docs, chore, ci, build, refactor, test, perf, style, revert\n` +
+                `  - scope (optional): lowercase, may contain digits, hyphens, underscores\n\n` +
+                `Examples:\n` +
+                `  feat: add custom persona loading\n` +
+                `  fix(debate): handle empty findings list\n` +
+                `  docs: update quickstart guide\n\n` +
+                `Got: "${title}"`
+              );
+            }

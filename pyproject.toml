@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dissent"
+dynamic = ["version"]
+description = "Swarm intelligence for code review - diverse expert agents that debate your diffs"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "arbit"}]
+requires-python = ">=3.10"
+keywords = ["ai", "code-review", "swarm-intelligence", "multi-agent", "llm", "agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "click>=8.0",
+    "openai>=1.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/itsarbit/dissent"
+Repository = "https://github.com/itsarbit/dissent"
+Issues = "https://github.com/itsarbit/dissent/issues"
+Changelog = "https://github.com/itsarbit/dissent/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov",
+    "pytest-timeout",
+    "pre-commit",
+    "ruff",
+]
+
+[project.scripts]
+dissent = "dissent.cli:main"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "dissent/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dissent"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "E501", # line too long (managed by ruff format)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dissent"]
+
+[tool.coverage.run]
+source = ["dissent"]
+
+[tool.coverage.report]
+fail_under = 60
