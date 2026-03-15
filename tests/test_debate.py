@@ -74,6 +74,35 @@ class TestBuildConsensus:
         assert len(result["findings"]) == 0
         assert len(result["withdrawn"]) == 1
 
+    def test_deduplicates_findings_at_same_file_and_line(self):
+        reviews = {
+            "security": [
+                {
+                    "title": "Global mutable state",
+                    "severity": "medium",
+                    "detail": "thread unsafe",
+                    "file": "router.py",
+                    "line": 49,
+                    "source": "security",
+                },
+            ],
+            "readability": [
+                {
+                    "title": "Global dict is confusing",
+                    "severity": "low",
+                    "detail": "hard to follow",
+                    "file": "router.py",
+                    "line": 49,
+                    "source": "readability",
+                },
+            ],
+        }
+        result = _build_consensus(reviews, {}, {"security": {}, "readability": {}})
+        # Two findings at the same file:line should be merged into one
+        assert len(result["findings"]) == 1
+        assert result["findings"][0]["title"] == "Global mutable state"
+        assert "readability" in result["findings"][0].get("co_authors", [])
+
     def test_new_findings_from_debate(self):
         reviews = {"security": []}
         debate = {

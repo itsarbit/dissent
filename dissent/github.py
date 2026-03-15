@@ -153,7 +153,8 @@ def _build_inline_comments(findings: list[dict]) -> list[dict]:
             continue
 
         severity = f.get("severity", "low").upper()
-        source = f.get("source", "unknown")
+        co_authors = f.get("co_authors", [])
+        source = ", ".join(co_authors) if co_authors else f.get("source", "unknown")
         endorsements = f.get("endorsements", [])
         challenges = f.get("challenges", [])
         score = f.get("consensus_score", 0)

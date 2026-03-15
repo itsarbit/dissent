@@ -68,6 +68,7 @@ Review all findings and respond with JSON:
 Rules:
 - Endorse findings you genuinely agree are real issues.
 - Challenge findings you believe are wrong, exaggerated, or not applicable.
+- Also challenge findings whose technical reasoning is factually incorrect, even if the general concern area is valid.
 - Add new findings only if the discussion revealed something you missed.
 - Withdraw your own findings if other reviewers convinced you otherwise.
 - Be honest and specific. Don't rubber-stamp everything."""
@@ -191,6 +192,26 @@ def _build_consensus(
                         "from_debate": True,
                     }
                 )
+
+    # Deduplicate findings that point to the same file+line - keep the one with
+    # higher severity (or first seen), merge the other's source into co_authors.
+    seen_locations: dict[tuple, int] = {}  # (file, line) -> index in findings
+    deduped: list[dict] = []
+    for f in findings:
+        loc = (f.get("file"), f.get("line"))
+        if loc[0] and loc[1] and loc in seen_locations:
+            primary = deduped[seen_locations[loc]]
+            # Merge: add the duplicate's source as a co-author if different
+            if f.get("source") and f["source"] not in primary.get("co_authors", [primary["source"]]):
+                primary.setdefault("co_authors", [primary["source"]]).append(f["source"])
+            # Absorb endorsements and challenges from the duplicate
+            primary["endorsements"].extend(f.get("endorsements", []))
+            primary["challenges"].extend(f.get("challenges", []))
+        else:
+            if loc[0] and loc[1]:
+                seen_locations[loc] = len(deduped)
+            deduped.append(f)
+    findings = deduped
 
     # Score
     severity_weight = {"high": 3, "medium": 2, "low": 1}

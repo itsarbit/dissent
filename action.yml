@@ -18,7 +18,7 @@ inputs:
     description: "Number of debate rounds between agents"
     default: "2"
   personas:
-    description: "Comma-separated list of personas to use (default: all). Options: security,performance,readability,architecture,testing"
+    description: "Comma-separated list of personas to use (default: all). Options: security,performance,readability,architecture,testing,correctness"
     required: false
   persona-file:
     description: "Path to a custom persona YAML file (.dissent.yaml)"

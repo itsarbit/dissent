@@ -46,9 +46,16 @@ def _print_terminal(consensus: dict) -> None:
         severity = f.get("severity", "low")
         sev_color = sev_colors.get(severity, "white")
 
-        source_persona = PERSONAS.get(f.get("source", ""), {})
-        source_color = source_persona.get("color", "white")
-        source_name = source_persona.get("name", f.get("source", "unknown"))
+        co_authors = f.get("co_authors", [])
+        if co_authors:
+            source_color = "white"
+            source_name = ", ".join(
+                PERSONAS.get(a, {}).get("name", a) for a in co_authors
+            )
+        else:
+            source_persona = PERSONAS.get(f.get("source", ""), {})
+            source_color = source_persona.get("color", "white")
+            source_name = source_persona.get("name", f.get("source", "unknown"))
 
         endorsements = f.get("endorsements", [])
         challenges = f.get("challenges", [])

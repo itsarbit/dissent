@@ -112,7 +112,7 @@ jobs:
 
 ## Custom Personas
 
-Dissent ships with 5 built-in personas: `security`, `performance`, `readability`, `architecture`, and `testing`.
+Dissent ships with 6 built-in personas: `security`, `performance`, `readability`, `architecture`, `testing`, and `correctness`.
 
 Define your own by creating a `.dissent.yaml` in your project root (auto-loaded) or by passing `--persona-file`:
 
@@ -194,6 +194,46 @@ Dissent's review process mirrors [MiroFish](https://github.com/666ghj/MiroFish)'
 **Consensus scoring**: Each finding is scored as `(1 + endorsements - challenges) * severity_weight`. Cross-domain agreement pushes findings to the top. Heavy challenges bury them. Withdrawn findings are removed.
 
 **Swarm summary**: The final output shows what the swarm agrees on, what it's split on, and what emerged only through debate.
+
+## Reading the Output
+
+Each finding in the terminal output (and as a GitHub inline comment) looks like this:
+
+```
+╭─────────── #1  HIGH  SQL Injection in query builder ───────────╮
+│ src/db.py:42                                                   │
+│ User input is concatenated directly into a raw SQL string.     │
+│                                                                │
+│ Suggestion: Use parameterized queries or an ORM.               │
+│                                                                │
+│ Endorsed by: Performance, Architecture                         │
+│ Challenged by Testing: this path is unreachable in production  │
+│                                                                │
+│ Found by Security  |  Consensus score: 6                       │
+╰────────────────────────────────────────────────────────────────╯
+```
+
+**Consensus score** is calculated as:
+
+```
+(1 + endorsements - challenges) × severity_weight
+```
+
+Where `severity_weight` is `high=3`, `medium=2`, `low=1`. A finding endorsed by 2 agents with no challenges gets a score of `(1 + 2 - 0) × 3 = 9`. A finding that gets challenged twice scores `(1 + 0 - 2) × 3 = -3` and is buried at the bottom. Findings are sorted by score, so the most cross-domain-agreed issues always surface first.
+
+**Endorsements** mean another agent - from a different domain - read the finding and confirmed it's a genuine issue. A security finding endorsed by performance and architecture carries more weight than one agent's opinion alone.
+
+**Challenges** mean an agent pushed back with a reason. Challenges don't disqualify a finding - they reduce its score and are shown inline so you can read both sides and decide.
+
+**Withdrawn** means the original agent retracted the finding after hearing the debate. Withdrawn findings are removed from the main list but counted in the swarm summary.
+
+**Swarm summary categories** at the bottom of the output:
+
+| Category | Meaning |
+|----------|---------|
+| **Swarm agrees on** | Endorsed by 2+ agents, no challenges - high confidence |
+| **Swarm split on** | Both endorsed and challenged - read the debate, use your judgement |
+| **Emerged from debate** | Not found in round 1 - only surfaced because an agent saw another's finding |
 
 ## Development
 

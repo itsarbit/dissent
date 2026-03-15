@@ -38,7 +38,7 @@ from dissent.personas import load_personas
 @click.option(
     "--personas",
     default=None,
-    help="Comma-separated list: security,performance,readability,architecture,testing",
+    help="Comma-separated list: security,performance,readability,architecture,testing,correctness",
 )
 @click.option(
     "--persona-file",

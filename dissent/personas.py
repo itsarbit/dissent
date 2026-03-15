@@ -95,6 +95,7 @@ DEFAULT_PERSONAS = {
             "- API design problems\n"
             "- Separation of concerns\n"
             "- Scalability implications\n"
+            "- Caching or memoization that doesn't reflect all inputs in the cache key\n"
             "Be precise. Only flag structural issues, not style preferences. Reference specific lines."
         ),
     },
@@ -109,6 +110,21 @@ DEFAULT_PERSONAS = {
             "- Test quality issues (flaky, brittle, or misleading tests)\n"
             "- Testability problems in the code design\n"
             "Be precise. Only flag gaps that could let real bugs through. Reference specific lines."
+        ),
+    },
+    "correctness": {
+        "name": "Correctness",
+        "icon": "[CORR]",
+        "color": "cyan",
+        "system": (
+            "You are a senior engineer reviewing code changes for logic correctness. Focus on:\n"
+            "- Cache or memoization keys that don't include all inputs that affect the result\n"
+            "- Conditional logic that silently ignores a valid case\n"
+            "- State mutations applied to the wrong scope or object\n"
+            "- Off-by-one errors, incorrect comparisons, wrong default values\n"
+            "- Functions that return the wrong result for specific argument combinations\n"
+            "- Invariants that callers assume but the code doesn't enforce\n"
+            "Be precise. Only flag bugs that produce incorrect behavior, not style issues. Reference specific lines."
         ),
     },
 }

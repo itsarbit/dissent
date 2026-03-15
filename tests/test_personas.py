@@ -5,8 +5,8 @@ from dissent.personas import DEFAULT_PERSONAS, load_personas
 
 
 class TestDefaultPersonas:
-    def test_has_five_built_in_personas(self):
-        assert len(DEFAULT_PERSONAS) == 5
+    def test_has_six_built_in_personas(self):
+        assert len(DEFAULT_PERSONAS) == 6
 
     def test_all_personas_have_required_keys(self):
         required = {"name", "icon", "color", "system"}
@@ -15,7 +15,10 @@ class TestDefaultPersonas:
             assert not missing, f"Persona '{key}' missing keys: {missing}"
 
     def test_persona_names(self):
-        expected = {"security", "performance", "readability", "architecture", "testing"}
+        expected = {
+            "security", "performance", "readability",
+            "architecture", "testing", "correctness",
+        }
         assert set(DEFAULT_PERSONAS.keys()) == expected
 
 
