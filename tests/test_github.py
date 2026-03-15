@@ -1,8 +1,12 @@
+import json
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from dissent.github import (
     _build_inline_comments,
     _build_review_body,
+    _find_existing_review,
     _findings_as_body,
     parse_pr_url,
 )
@@ -107,6 +111,45 @@ class TestBuildInlineComments:
         ]
         comments = _build_inline_comments(findings)
         assert "Challenged by security" in comments[0]["body"]
+
+
+class TestFindExistingReview:
+    def _make_run(self, reviews):
+        mock = MagicMock()
+        mock.returncode = 0
+        mock.stdout = json.dumps(reviews)
+        return mock
+
+    def test_returns_none_when_no_reviews(self):
+        with patch("dissent.github.subprocess.run", return_value=self._make_run([])):
+            assert _find_existing_review("o", "r", 1) is None
+
+    def test_returns_none_when_no_dissent_review(self):
+        reviews = [{"id": 1, "body": "Some other review"}]
+        with patch("dissent.github.subprocess.run", return_value=self._make_run(reviews)):
+            assert _find_existing_review("o", "r", 1) is None
+
+    def test_returns_id_of_dissent_review(self):
+        reviews = [
+            {"id": 99, "body": "## Dissent Review\n\n**3 agents**"},
+        ]
+        with patch("dissent.github.subprocess.run", return_value=self._make_run(reviews)):
+            assert _find_existing_review("o", "r", 1) == 99
+
+    def test_returns_most_recent_when_multiple(self):
+        reviews = [
+            {"id": 10, "body": "## Dissent Review\n\nfirst"},
+            {"id": 20, "body": "## Dissent Review\n\nsecond"},
+        ]
+        with patch("dissent.github.subprocess.run", return_value=self._make_run(reviews)):
+            assert _find_existing_review("o", "r", 1) == 20
+
+    def test_returns_none_on_api_error(self):
+        mock = MagicMock()
+        mock.returncode = 1
+        mock.stdout = ""
+        with patch("dissent.github.subprocess.run", return_value=mock):
+            assert _find_existing_review("o", "r", 1) is None
 
 
 class TestFindingsAsBody:

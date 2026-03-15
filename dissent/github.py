@@ -42,61 +42,112 @@ def post_review(
     pr_number: int,
     consensus: dict,
 ) -> str:
-    """Post a PR review with inline comments and a swarm summary."""
+    """Post a PR review with inline comments and a swarm summary.
+
+    Always posts a fresh review so inline comments are grouped correctly.
+    Any previous Dissent reviews on this PR are marked as superseded.
+    """
     findings = consensus["findings"]
     summary = consensus.get("summary", {})
 
     body = _build_review_body(consensus, summary)
     comments = _build_inline_comments(findings)
 
-    review_payload = {
-        "body": body,
-        "event": "COMMENT",
-        "comments": comments,
-    }
+    review_payload = {"body": body, "event": "COMMENT", "comments": comments}
 
     result = subprocess.run(
-        [
-            "gh",
-            "api",
-            f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
-            "--method",
-            "POST",
-            "--input",
-            "-",
-        ],
+        ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
+         "--method", "POST", "--input", "-"],
         input=json.dumps(review_payload),
         capture_output=True,
         text=True,
     )
 
     if result.returncode != 0:
-        # If inline comments fail (line not in diff), retry without them
         if "pull_request_review_thread.line" in result.stderr:
             review_payload["comments"] = []
             review_payload["body"] = body + _findings_as_body(findings)
             result = subprocess.run(
-                [
-                    "gh",
-                    "api",
-                    f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
-                    "--method",
-                    "POST",
-                    "--input",
-                    "-",
-                ],
+                ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
+                 "--method", "POST", "--input", "-"],
                 input=json.dumps(review_payload),
                 capture_output=True,
                 text=True,
             )
             if result.returncode != 0:
                 raise RuntimeError(f"Failed to post review: {result.stderr.strip()}")
-
         else:
             raise RuntimeError(f"Failed to post review: {result.stderr.strip()}")
 
-    response = json.loads(result.stdout)
-    return response.get("html_url", "Review posted successfully.")
+    new_review = json.loads(result.stdout)
+    new_url = new_review.get("html_url", "")
+    new_id = new_review.get("id")
+
+    # Mark any previous Dissent reviews as superseded
+    _supersede_old_reviews(owner, repo, pr_number, skip_id=new_id, new_url=new_url)
+
+    return new_url or "Review posted successfully."
+
+
+def _find_existing_review(owner: str, repo: str, pr_number: int) -> int | None:
+    """Return the review ID of the most recent Dissent review on this PR, or None."""
+    result = subprocess.run(
+        ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        reviews = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    for review in reversed(reviews):
+        if "## Dissent Review" in review.get("body", ""):
+            return review["id"]
+    return None
+
+
+def _supersede_old_reviews(
+    owner: str,
+    repo: str,
+    pr_number: int,
+    skip_id: int | None,
+    new_url: str,
+) -> None:
+    """Update body of all previous Dissent reviews to say they've been superseded."""
+    result = subprocess.run(
+        ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return
+    try:
+        reviews = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return
+
+    superseded_body = (
+        "## Dissent Review *(superseded)*\n\n"
+        f"A newer review has been posted{f': {new_url}' if new_url else ''}."
+    )
+
+    for review in reviews:
+        rid = review.get("id")
+        if rid == skip_id:
+            continue
+        if "## Dissent Review" not in review.get("body", ""):
+            continue
+        if "superseded" in review.get("body", ""):
+            continue
+        subprocess.run(
+            ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews/{rid}",
+             "--method", "PUT", "--input", "-"],
+            input=json.dumps({"body": superseded_body}),
+            capture_output=True,
+            text=True,
+        )
 
 
 def _build_review_body(consensus: dict, summary: dict) -> str:
