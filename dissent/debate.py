@@ -13,15 +13,20 @@ Review the following code diff. Return your findings as JSON:
     {{
       "severity": "high | medium | low",
       "file": "path/to/file",
-      "line": null,
-      "title": "Short description",
-      "detail": "Explanation of the issue",
-      "suggestion": "What to do instead"
+      "line": <line number as integer, or null>,
+      "title": "Short specific title naming the exact problem (not the category)",
+      "detail": "Explain the issue with a concrete scenario: what input or condition triggers it, what goes wrong, and why it matters.",
+      "suggestion": "Specific fix at the code level - name the function, pattern, or change needed, not just a vague direction."
     }}
   ]
 }}
 
-If you find no real issues from your perspective, return {{"findings": []}}.
+Guidelines:
+- Title must be specific. Bad: "Cache issue". Good: "`required_capability` missing from cache key".
+- Detail must include a concrete scenario showing when the bug triggers or the risk materializes.
+- Suggestion must be actionable at the code level - name the specific function, pattern, or line change needed.
+- Skip pure style preferences and formatting nitpicks. Focus on bugs, risks, and correctness issues.
+- If you find no real issues from your perspective, return {{"findings": []}}.
 
 DIFF:
 {diff}"""
@@ -41,37 +46,36 @@ Review all findings and respond with JSON:
   "endorsements": [
     {{
       "reviewer": "persona_name",
-      "finding_title": "title of the finding",
-      "comment": "why you agree (brief, optional)"
+      "finding_title": "exact title of the finding you are endorsing",
+      "comment": "one sentence on why this is a real issue from your domain"
     }}
   ],
   "challenges": [
     {{
       "reviewer": "persona_name",
-      "finding_title": "title of the finding",
-      "reason": "why you disagree"
+      "finding_title": "exact title of the finding you are challenging",
+      "reason": "specific reason: either the bug doesn't exist, the scenario is impossible, or the technical reasoning is factually wrong"
     }}
   ],
   "new_findings": [
     {{
       "severity": "high | medium | low",
       "file": "path/to/file",
-      "line": null,
-      "title": "Short description",
-      "detail": "Explanation",
-      "suggestion": "What to do instead"
+      "line": <line number as integer, or null>,
+      "title": "Short specific title naming the exact problem",
+      "detail": "Concrete scenario showing when and how this breaks",
+      "suggestion": "Specific code-level fix"
     }}
   ],
-  "withdrawn": ["titles of your own findings you now withdraw"]
+  "withdrawn": ["exact titles of your own findings you now withdraw"]
 }}
 
 Rules:
-- Endorse findings you genuinely agree are real issues.
-- Challenge findings you believe are wrong, exaggerated, or not applicable.
-- Also challenge findings whose technical reasoning is factually incorrect, even if the general concern area is valid.
-- Add new findings only if the discussion revealed something you missed.
-- Withdraw your own findings if other reviewers convinced you otherwise.
-- Be honest and specific. Don't rubber-stamp everything."""
+- Only endorse findings you are genuinely confident are real issues from your domain.
+- Challenge findings if: the bug doesn't actually exist, the scenario is impossible in this codebase, or the technical reasoning is factually wrong.
+- Add new findings only if seeing the other reviews revealed a real issue you missed - and only if it meets the same bar as round 1.
+- Withdraw your own findings if another reviewer made a convincing case they are wrong or not applicable.
+- Do not rubber-stamp. A low-quality endorsement hurts signal more than it helps."""
 
 
 async def run_review(
@@ -158,21 +162,29 @@ def _build_consensus(
                     }
                 )
 
-    # Apply debate responses
+    # Apply debate responses - deduplicate so each reviewer can only
+    # endorse or challenge a given finding once, even across multiple rounds.
+    endorsed: dict[str, set[str]] = {}   # finding_title -> set of reviewer names
+    challenged: dict[str, set[str]] = {}
+
     for reviewer, response in debate_responses.items():
         for e in response.get("endorsements", []):
             title = e.get("finding_title", "")
             if title in index:
-                findings[index[title]]["endorsements"].append(
-                    {"reviewer": reviewer, "comment": e.get("comment", "")}
-                )
+                if reviewer not in endorsed.setdefault(title, set()):
+                    endorsed[title].add(reviewer)
+                    findings[index[title]]["endorsements"].append(
+                        {"reviewer": reviewer, "comment": e.get("comment", "")}
+                    )
 
         for c in response.get("challenges", []):
             title = c.get("finding_title", "")
             if title in index:
-                findings[index[title]]["challenges"].append(
-                    {"reviewer": reviewer, "reason": c.get("reason", "")}
-                )
+                if reviewer not in challenged.setdefault(title, set()):
+                    challenged[title].add(reviewer)
+                    findings[index[title]]["challenges"].append(
+                        {"reviewer": reviewer, "reason": c.get("reason", "")}
+                    )
 
         for title in response.get("withdrawn", []):
             if title in index:
