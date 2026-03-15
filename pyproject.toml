@@ -48,6 +48,7 @@ dev = [
 
 [project.scripts]
 dissent = "dissent.cli:main"
+dissent-pr = "dissent.github_cli:main"
 
 [tool.hatch.version]
 source = "vcs"

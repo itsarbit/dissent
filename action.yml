@@ -1,0 +1,60 @@
+name: "Dissent Review"
+description: "Swarm intelligence code review - diverse expert agents that debate your PRs"
+branding:
+  icon: "message-circle"
+  color: "purple"
+
+inputs:
+  model:
+    description: "LLM model to use"
+    default: "gpt-4o"
+  api-key:
+    description: "OpenAI API key (or compatible provider key)"
+    required: true
+  base-url:
+    description: "API base URL (for Ollama, vLLM, etc.)"
+    required: false
+  rounds:
+    description: "Number of debate rounds"
+    default: "2"
+  personas:
+    description: "Comma-separated persona list (default: all)"
+    required: false
+  persona-file:
+    description: "Path to custom persona YAML file"
+    required: false
+  github-token:
+    description: "GitHub token for posting review comments"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+
+    - name: Install dissent
+      shell: bash
+      run: pip install dissent
+
+    - name: Run dissent review
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.api-key }}
+        DISSENT_MODEL: ${{ inputs.model }}
+        DISSENT_BASE_URL: ${{ inputs.base-url }}
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+      run: |
+        ARGS="--rounds ${{ inputs.rounds }}"
+
+        if [ -n "${{ inputs.personas }}" ]; then
+          ARGS="$ARGS --personas ${{ inputs.personas }}"
+        fi
+
+        if [ -n "${{ inputs.persona-file }}" ]; then
+          ARGS="$ARGS --persona-file ${{ inputs.persona-file }}"
+        fi
+
+        dissent-pr "${{ github.event.pull_request.html_url }}" $ARGS
