@@ -37,7 +37,7 @@ runs:
 
     - name: Install dissent
       shell: bash
-      run: pip install --quiet "dissent==0.1.0"
+      run: pip install --quiet "dissent==0.2.0"
 
     - name: Run dissent review
       shell: bash
