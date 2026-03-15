@@ -1,4 +1,4 @@
-from dissent.debate import _build_consensus, _build_summary
+from dissent.debate import _build_consensus, _build_summary, _challenge_is_grounded
 
 
 class TestBuildConsensus:
@@ -118,6 +118,66 @@ class TestBuildConsensus:
         result = _build_consensus(reviews, debate, {"security": {}, "performance": {}})
         assert len(result["findings"]) == 1
         assert result["findings"][0]["from_debate"] is True
+
+
+class TestChallengeIsGrounded:
+    def test_no_quoted_claim_is_accepted(self):
+        challenge = {"reason": "doesn't matter"}
+        finding = {"title": "Cache bug", "detail": "bad cache"}
+        assert _challenge_is_grounded(challenge, finding) is True
+
+    def test_quoted_claim_matching_finding_is_accepted(self):
+        challenge = {
+            "quoted_claim": "required_capability is missing from the cache key",
+            "reason": "actually it is included",
+        }
+        finding = {
+            "title": "Cache key missing required_capability",
+            "detail": "required_capability is not included in the cache key tuple",
+        }
+        assert _challenge_is_grounded(challenge, finding) is True
+
+    def test_hallucinated_claim_not_in_finding_is_rejected(self):
+        challenge = {
+            "quoted_claim": "tuples are mutable and can lead to unexpected behavior",
+            "reason": "tuples are immutable in Python",
+        }
+        finding = {
+            "title": "Cache key does not include required_capability",
+            "detail": "The cache key is missing the required_capability parameter",
+            "suggestion": "Add required_capability to the cache key",
+        }
+        assert _challenge_is_grounded(challenge, finding) is False
+
+    def test_hallucinated_challenge_filtered_from_consensus(self):
+        reviews = {
+            "security": [
+                {
+                    "title": "Missing param in cache key",
+                    "severity": "medium",
+                    "detail": "required_capability is not in the cache key",
+                }
+            ]
+        }
+        debate = {
+            "performance": {
+                "endorsements": [],
+                "challenges": [
+                    {
+                        "finding_title": "Missing param in cache key",
+                        "quoted_claim": "tuples are mutable objects that can change",
+                        "reason": "tuples are immutable in Python",
+                    }
+                ],
+                "withdrawn": [],
+                "new_findings": [],
+            }
+        }
+        result = _build_consensus(reviews, debate, {"security": {}, "performance": {}})
+        # Hallucinated challenge should be filtered - score unaffected
+        finding = result["findings"][0]
+        assert len(finding["challenges"]) == 0
+        assert finding["consensus_score"] == 2  # (1+0-0)*2, challenge was discarded
 
 
 class TestBuildSummary:

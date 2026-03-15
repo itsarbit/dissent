@@ -1,9 +1,41 @@
 import asyncio
 import json
+import re
 from collections.abc import Callable
 
 from dissent.llm import chat_json, create_client
 from dissent.personas import DEFAULT_PERSONAS
+
+_STOPWORDS = {
+    "a", "an", "the", "is", "it", "in", "of", "to", "that", "this",
+    "are", "be", "by", "or", "and", "not", "if", "so", "as", "at",
+    "on", "for", "its", "was", "has", "with", "can", "but", "may",
+}
+
+
+def _challenge_is_grounded(challenge: dict, finding: dict) -> bool:
+    """Return False if the challenge quotes a claim that doesn't appear in the finding.
+
+    Agents sometimes challenge a premise they invented rather than something the
+    finding actually says. If they provided a `quoted_claim`, we check that at
+    least one meaningful word from the quote exists in the finding text. If zero
+    meaningful words match, the challenge is almost certainly hallucinated.
+    """
+    quoted = challenge.get("quoted_claim", "").strip()
+    if not quoted:
+        return True  # No quote provided - accept, the prompt-level fix handles this
+
+    finding_text = " ".join([
+        finding.get("title", ""),
+        finding.get("detail", ""),
+        finding.get("suggestion", ""),
+    ]).lower()
+
+    words = {w for w in re.findall(r"[a-z_`']{4,}", quoted.lower()) if w not in _STOPWORDS}
+    if not words:
+        return True  # Quote too short to judge
+
+    return any(w in finding_text for w in words)
 
 REVIEW_PROMPT = """\
 Review the following code diff. Return your findings as JSON:
@@ -54,7 +86,8 @@ Review all findings and respond with JSON:
     {{
       "reviewer": "persona_name",
       "finding_title": "exact title of the finding you are challenging",
-      "reason": "specific reason: either the bug doesn't exist, the scenario is impossible, or the technical reasoning is factually wrong"
+      "quoted_claim": "copy the exact sentence or phrase from the finding that you believe is wrong",
+      "reason": "why that specific claim is incorrect - the bug doesn't exist, the scenario is impossible, or the quoted claim is factually wrong"
     }}
   ],
   "new_findings": [
@@ -72,7 +105,8 @@ Review all findings and respond with JSON:
 
 Rules:
 - Only endorse findings you are genuinely confident are real issues from your domain.
-- Challenge findings if: the bug doesn't actually exist, the scenario is impossible in this codebase, or the technical reasoning is factually wrong.
+- Before challenging, re-read the finding text carefully. Only challenge claims the finding explicitly makes - do not challenge your own interpretation or an assumption you've added.
+- Challenge findings if: the bug doesn't actually exist, the scenario is impossible in this codebase, or a specific claim in the finding is factually wrong.
 - Add new findings only if seeing the other reviews revealed a real issue you missed - and only if it meets the same bar as round 1.
 - Withdraw your own findings if another reviewer made a convincing case they are wrong or not applicable.
 - Do not rubber-stamp. A low-quality endorsement hurts signal more than it helps."""
@@ -181,10 +215,11 @@ def _build_consensus(
             title = c.get("finding_title", "")
             if title in index:
                 if reviewer not in challenged.setdefault(title, set()):
-                    challenged[title].add(reviewer)
-                    findings[index[title]]["challenges"].append(
-                        {"reviewer": reviewer, "reason": c.get("reason", "")}
-                    )
+                    if _challenge_is_grounded(c, findings[index[title]]):
+                        challenged[title].add(reviewer)
+                        findings[index[title]]["challenges"].append(
+                            {"reviewer": reviewer, "reason": c.get("reason", "")}
+                        )
 
         for title in response.get("withdrawn", []):
             if title in index:
@@ -216,9 +251,17 @@ def _build_consensus(
             # Merge: add the duplicate's source as a co-author if different
             if f.get("source") and f["source"] not in primary.get("co_authors", [primary["source"]]):
                 primary.setdefault("co_authors", [primary["source"]]).append(f["source"])
-            # Absorb endorsements and challenges from the duplicate
-            primary["endorsements"].extend(f.get("endorsements", []))
-            primary["challenges"].extend(f.get("challenges", []))
+            # Absorb endorsements and challenges, deduplicating by reviewer
+            existing_endorsers = {e["reviewer"] for e in primary["endorsements"]}
+            for e in f.get("endorsements", []):
+                if e["reviewer"] not in existing_endorsers:
+                    existing_endorsers.add(e["reviewer"])
+                    primary["endorsements"].append(e)
+            existing_challengers = {c["reviewer"] for c in primary["challenges"]}
+            for c in f.get("challenges", []):
+                if c["reviewer"] not in existing_challengers:
+                    existing_challengers.add(c["reviewer"])
+                    primary["challenges"].append(c)
         else:
             if loc[0] and loc[1]:
                 seen_locations[loc] = len(deduped)
