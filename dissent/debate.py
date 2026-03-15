@@ -7,9 +7,35 @@ from dissent.llm import chat_json, create_client
 from dissent.personas import DEFAULT_PERSONAS
 
 _STOPWORDS = {
-    "a", "an", "the", "is", "it", "in", "of", "to", "that", "this",
-    "are", "be", "by", "or", "and", "not", "if", "so", "as", "at",
-    "on", "for", "its", "was", "has", "with", "can", "but", "may",
+    "a",
+    "an",
+    "the",
+    "is",
+    "it",
+    "in",
+    "of",
+    "to",
+    "that",
+    "this",
+    "are",
+    "be",
+    "by",
+    "or",
+    "and",
+    "not",
+    "if",
+    "so",
+    "as",
+    "at",
+    "on",
+    "for",
+    "its",
+    "was",
+    "has",
+    "with",
+    "can",
+    "but",
+    "may",
 }
 
 
@@ -25,17 +51,22 @@ def _challenge_is_grounded(challenge: dict, finding: dict) -> bool:
     if not quoted:
         return True  # No quote provided - accept, the prompt-level fix handles this
 
-    finding_text = " ".join([
-        finding.get("title", ""),
-        finding.get("detail", ""),
-        finding.get("suggestion", ""),
-    ]).lower()
+    finding_text = " ".join(
+        [
+            finding.get("title", ""),
+            finding.get("detail", ""),
+            finding.get("suggestion", ""),
+        ]
+    ).lower()
 
-    words = {w for w in re.findall(r"[a-z_`']{4,}", quoted.lower()) if w not in _STOPWORDS}
+    words = {
+        w for w in re.findall(r"[a-z_`']{4,}", quoted.lower()) if w not in _STOPWORDS
+    }
     if not words:
         return True  # Quote too short to judge
 
     return any(w in finding_text for w in words)
+
 
 REVIEW_PROMPT = """\
 Review the following code diff. Return your findings as JSON:
@@ -198,28 +229,29 @@ def _build_consensus(
 
     # Apply debate responses - deduplicate so each reviewer can only
     # endorse or challenge a given finding once, even across multiple rounds.
-    endorsed: dict[str, set[str]] = {}   # finding_title -> set of reviewer names
+    endorsed: dict[str, set[str]] = {}  # finding_title -> set of reviewer names
     challenged: dict[str, set[str]] = {}
 
     for reviewer, response in debate_responses.items():
         for e in response.get("endorsements", []):
             title = e.get("finding_title", "")
-            if title in index:
-                if reviewer not in endorsed.setdefault(title, set()):
-                    endorsed[title].add(reviewer)
-                    findings[index[title]]["endorsements"].append(
-                        {"reviewer": reviewer, "comment": e.get("comment", "")}
-                    )
+            if title in index and reviewer not in endorsed.setdefault(title, set()):
+                endorsed[title].add(reviewer)
+                findings[index[title]]["endorsements"].append(
+                    {"reviewer": reviewer, "comment": e.get("comment", "")}
+                )
 
         for c in response.get("challenges", []):
             title = c.get("finding_title", "")
-            if title in index:
-                if reviewer not in challenged.setdefault(title, set()):
-                    if _challenge_is_grounded(c, findings[index[title]]):
-                        challenged[title].add(reviewer)
-                        findings[index[title]]["challenges"].append(
-                            {"reviewer": reviewer, "reason": c.get("reason", "")}
-                        )
+            if (
+                title in index
+                and reviewer not in challenged.setdefault(title, set())
+                and _challenge_is_grounded(c, findings[index[title]])
+            ):
+                challenged[title].add(reviewer)
+                findings[index[title]]["challenges"].append(
+                    {"reviewer": reviewer, "reason": c.get("reason", "")}
+                )
 
         for title in response.get("withdrawn", []):
             if title in index:
@@ -249,8 +281,12 @@ def _build_consensus(
         if loc[0] and loc[1] and loc in seen_locations:
             primary = deduped[seen_locations[loc]]
             # Merge: add the duplicate's source as a co-author if different
-            if f.get("source") and f["source"] not in primary.get("co_authors", [primary["source"]]):
-                primary.setdefault("co_authors", [primary["source"]]).append(f["source"])
+            if f.get("source") and f["source"] not in primary.get(
+                "co_authors", [primary["source"]]
+            ):
+                primary.setdefault("co_authors", [primary["source"]]).append(
+                    f["source"]
+                )
             # Absorb endorsements and challenges, deduplicating by reviewer
             existing_endorsers = {e["reviewer"] for e in primary["endorsements"]}
             for e in f.get("endorsements", []):

@@ -56,8 +56,15 @@ def post_review(
     review_payload = {"body": body, "event": "COMMENT", "comments": comments}
 
     result = subprocess.run(
-        ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
-         "--method", "POST", "--input", "-"],
+        [
+            "gh",
+            "api",
+            f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
+            "--method",
+            "POST",
+            "--input",
+            "-",
+        ],
         input=json.dumps(review_payload),
         capture_output=True,
         text=True,
@@ -68,8 +75,15 @@ def post_review(
             review_payload["comments"] = []
             review_payload["body"] = body + _findings_as_body(findings)
             result = subprocess.run(
-                ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
-                 "--method", "POST", "--input", "-"],
+                [
+                    "gh",
+                    "api",
+                    f"repos/{owner}/{repo}/pulls/{pr_number}/reviews",
+                    "--method",
+                    "POST",
+                    "--input",
+                    "-",
+                ],
                 input=json.dumps(review_payload),
                 capture_output=True,
                 text=True,
@@ -142,8 +156,15 @@ def _supersede_old_reviews(
         if "superseded" in review.get("body", ""):
             continue
         subprocess.run(
-            ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr_number}/reviews/{rid}",
-             "--method", "PUT", "--input", "-"],
+            [
+                "gh",
+                "api",
+                f"repos/{owner}/{repo}/pulls/{pr_number}/reviews/{rid}",
+                "--method",
+                "PUT",
+                "--input",
+                "-",
+            ],
             input=json.dumps({"body": superseded_body}),
             capture_output=True,
             text=True,

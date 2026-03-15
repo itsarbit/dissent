@@ -16,8 +16,12 @@ class TestDefaultPersonas:
 
     def test_persona_names(self):
         expected = {
-            "security", "performance", "readability",
-            "architecture", "testing", "correctness",
+            "security",
+            "performance",
+            "readability",
+            "architecture",
+            "testing",
+            "correctness",
         }
         assert set(DEFAULT_PERSONAS.keys()) == expected
 

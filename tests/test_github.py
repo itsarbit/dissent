@@ -126,14 +126,18 @@ class TestFindExistingReview:
 
     def test_returns_none_when_no_dissent_review(self):
         reviews = [{"id": 1, "body": "Some other review"}]
-        with patch("dissent.github.subprocess.run", return_value=self._make_run(reviews)):
+        with patch(
+            "dissent.github.subprocess.run", return_value=self._make_run(reviews)
+        ):
             assert _find_existing_review("o", "r", 1) is None
 
     def test_returns_id_of_dissent_review(self):
         reviews = [
             {"id": 99, "body": "## Dissent Review\n\n**3 agents**"},
         ]
-        with patch("dissent.github.subprocess.run", return_value=self._make_run(reviews)):
+        with patch(
+            "dissent.github.subprocess.run", return_value=self._make_run(reviews)
+        ):
             assert _find_existing_review("o", "r", 1) == 99
 
     def test_returns_most_recent_when_multiple(self):
@@ -141,7 +145,9 @@ class TestFindExistingReview:
             {"id": 10, "body": "## Dissent Review\n\nfirst"},
             {"id": 20, "body": "## Dissent Review\n\nsecond"},
         ]
-        with patch("dissent.github.subprocess.run", return_value=self._make_run(reviews)):
+        with patch(
+            "dissent.github.subprocess.run", return_value=self._make_run(reviews)
+        ):
             assert _find_existing_review("o", "r", 1) == 20
 
     def test_returns_none_on_api_error(self):
